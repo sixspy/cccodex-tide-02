@@ -1,11 +1,13 @@
 import hashlib
 import hmac
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
 
-SECRET = os.environ.get("JWT_SECRET", "tide-telegram-dev-secret")
+# 没有配置密钥时每次启动随机生成，仓库里不再留一把人人可用的签名密钥。
+SECRET = os.environ.get("JWT_SECRET") or secrets.token_hex(32)
 SALT = "tide-telegram-v1"
 
 
@@ -50,4 +52,5 @@ def read_user(authorization: str | None):
     user = USERS.get(username)
     if not user:
         return None
-    return {"username": username, "role": payload.get("role"), "title": user["title"]}
+    # 角色以用户表为准，不认载荷里的 role——签了名也不许自己升级成归集员。
+    return {"username": username, "role": user["role"], "title": user["title"]}
