@@ -47,6 +47,16 @@
         <pre class="回执" id="规">加载中…</pre>
       </section>
       <section class="卷">
+        <h2>处理时缓冲再裁</h2>
+        <div id="再裁"></div>
+        <div class="工具">
+          <button class="按钮 青" id="切流">形态：切流</button>
+          <button class="按钮 青" id="双写">形态：双写</button>
+          <button class="按钮 次" id="关">停用（回基线）</button>
+        </div>
+        <p class="说明">切流＝窗外点从现行缓冲剔除并钉裁指纹；双写＝窗外点进只读归档、现行缓冲改读窗内集。批末后是否仍含窗外点见上方状态。</p>
+      </section>
+      <section class="卷">
         <h2>空桩目录</h2>
         <p class="说明" id="空桩"></p>
         <div class="双栏">
@@ -55,10 +65,21 @@
         </div>
       </section>
       <script>
-      (async () => {
+      async function 刷() {
         document.getElementById("规").textContent = JSON.stringify(await 潮切.getJSON("/api/窗规"), null, 2);
+        document.getElementById("再裁").innerHTML = 潮切.再裁组(await 潮切.getJSON("/api/再裁"));
+      }
+      async function 设(形态, 启用) {
+        await 潮切.postJSON("/api/再裁/形态", { 形态, 启用 });
+        await 刷();
+      }
+      document.getElementById("切流").onclick = () => 设("切流", true);
+      document.getElementById("双写").onclick = () => 设("双写", true);
+      document.getElementById("关").onclick = () => 设("切流", false);
+      (async () => {
         const s = await 潮切.getJSON("/api/空桩");
         document.getElementById("空桩").textContent = "空桩 " + s.条数 + "：" + (s.空桩 || []).join(" · ");
+        await 刷();
       })();
       </script>
 

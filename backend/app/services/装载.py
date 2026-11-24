@@ -1,10 +1,10 @@
-"""观测点装载 → 入窗或迟到。"""
+"""观测点装载 → 事件时入窗或迟到；启用再裁时改为处理时暂存、批末裁净。"""
 from __future__ import annotations
 import json
 import uuid
 from app.db import 连接
 from app.seed import 此刻
-from app.services import 校验, 目录, 时间
+from app.services import 校验, 目录, 时间, 再裁
 
 
 def 装一批(体: dict) -> dict:
@@ -17,8 +17,13 @@ def 装一批(体: dict) -> dict:
     窗号 = 规.get("当前窗号", "W-demo")
     窗起 = 规.get("窗起", "2026-11-24T00:00:00Z")
     窗止 = 规.get("窗止", "2026-11-24T01:00:00Z")
+    态 = 再裁.状态(规)
     conn = 连接()
+    已提交 = False
     try:
+        if 态["启用"]:
+            # 暂存与批末裁净同事务；与关窗写锁串行，避免半裁/双写。
+            conn.execute("BEGIN IMMEDIATE")
         for ev in 事件:
             行错 = 校验.校验事件(ev)
             if 行错:
@@ -37,7 +42,11 @@ def 装一批(体: dict) -> dict:
                 (编号, ev["运单键"], ev["网点键"], ev["事件时"], 处理, "已装载", 批次),
             )
             报告["入流"] += 1
-            if 时间.在窗内(ev["事件时"], 窗起, 窗止):
+            if 态["启用"]:
+                再裁.暂存(conn, ev, 处理, 批次)
+                报告["暂存"] = 报告.get("暂存", 0) + 1
+                报告["明细"].append({"命运": "暂存", "事件编号": 编号, "批次编号": 批次})
+            elif 时间.在窗内(ev["事件时"], 窗起, 窗止):
                 conn.execute(
                     """INSERT INTO 入窗缓冲(事件编号,运单键,网点键,事件时,窗号,命运,入缓冲时)
                        VALUES (?,?,?,?,?,?,?)""",
@@ -55,11 +64,30 @@ def 装一批(体: dict) -> dict:
                 conn.execute("UPDATE 观测点 SET 命运=? WHERE 事件编号=?", ("已迟到", 编号))
                 报告["迟到"] += 1
                 报告["明细"].append({"命运": "迟到", "事件编号": 编号})
+        if 态["启用"]:
+            账 = 再裁.批末裁净(conn, 批次, 窗号, 窗起, 窗止, 态["形态"])
+            报告["再裁"] = 账
+            报告["入缓冲"] = 账["入窗数"]
+            剔除命运 = "归档" if 态["形态"] == "双写" else "迟到"
+            报告["归档" if 态["形态"] == "双写" else "迟到"] = 账["剔除数"]
+            for 编号 in 账["入窗"]:
+                报告["明细"].append({"命运": "入缓冲", "事件编号": 编号, "窗号": 窗号})
+            for 编号 in 账["剔除"]:
+                报告["明细"].append({"命运": 剔除命运, "事件编号": 编号, "窗号": 窗号})
         conn.execute(
             """INSERT INTO 装载批次(编号,时刻,入流,入缓冲,迟到,报告) VALUES (?,?,?,?,?,?)""",
             (批次, 此刻(), 报告["入流"], 报告["入缓冲"], 报告["迟到"], json.dumps(报告, ensure_ascii=False)),
         )
         conn.commit()
+        已提交 = True
+    except Exception as 错:
+        conn.rollback()
+        if 态["启用"] and not 已提交:
+            try:
+                再裁.收口(批次, str(错), 态["形态"], 窗号, "批末")
+            except Exception:
+                pass
+        raise
     finally:
         conn.close()
     return 报告

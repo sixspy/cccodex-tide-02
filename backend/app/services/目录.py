@@ -50,6 +50,14 @@ def 缓冲列表() -> list[dict]:
         conn.close()
 
 
+def 暂存列表() -> list[dict]:
+    conn = 连接()
+    try:
+        return [dict(r) for r in conn.execute("SELECT * FROM 暂存缓冲 ORDER BY 事件时 LIMIT 200").fetchall()]
+    finally:
+        conn.close()
+
+
 def 切片列表() -> list[dict]:
     conn = 连接()
     try:

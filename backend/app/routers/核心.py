@@ -2,7 +2,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 from pathlib import Path
-from app.services import 目录, 装载, 关窗, 贯验, 夹具, 统计, 说明
+from app.services import 目录, 装载, 关窗, 贯验, 夹具, 统计, 说明, 再裁
 
 
 async def api_概览(request: Request):
@@ -32,6 +32,10 @@ async def api_观测(request: Request):
 
 async def api_缓冲(request: Request):
     return JSONResponse(目录.缓冲列表())
+
+
+async def api_暂存(request: Request):
+    return JSONResponse(目录.暂存列表())
 
 
 async def api_切片(request: Request):
@@ -85,8 +89,34 @@ async def api_空桩(request: Request):
     if root.is_dir():
         for p in sorted(root.iterdir()):
             if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file():
+                src = (p / "__init__.py").read_text(encoding="utf-8")
+                # 已实现的邻题不再列作空桩
+                if "\n已实现 = True" in src:
+                    continue
                 out.append(p.name)
     return JSONResponse({"空桩": out, "条数": len(out)})
+
+
+async def api_再裁(request: Request):
+    return JSONResponse(再裁.只读())
+
+
+async def api_再裁形态(request: Request):
+    body = await request.json()
+    形态 = str((body or {}).get("形态") or "")
+    if 形态 not in 再裁.形态集:
+        return JSONResponse({"错误": f"形态须为 {'/'.join(再裁.形态集)}"}, status_code=400)
+    启用 = (body or {}).get("启用")
+    补 = {"再裁形态": 形态}
+    if 启用 is not None:
+        补["缓冲再裁"] = "开" if 启用 else "关"
+    目录.改窗规(补)
+    return JSONResponse(再裁.只读())
+
+
+async def api_再裁归档(request: Request):
+    键 = request.path_params["key"]
+    return JSONResponse({"归档键": 键, "行": 再裁.归档列表(键)})
 
 
 路由表 = [
@@ -97,6 +127,7 @@ async def api_空桩(request: Request):
     Route("/api/网点源", api_网点),
     Route("/api/观测点", api_观测),
     Route("/api/入窗缓冲", api_缓冲),
+    Route("/api/暂存缓冲", api_暂存),
     Route("/api/窗切片账", api_切片),
     Route("/api/迟到匣", api_迟到),
     Route("/api/窗贯验", api_贯验列表),
@@ -108,4 +139,7 @@ async def api_空桩(request: Request):
     Route("/api/统计/观测命运", api_统计观测),
     Route("/api/统计/缓冲命运", api_统计缓冲),
     Route("/api/空桩", api_空桩),
+    Route("/api/再裁", api_再裁),
+    Route("/api/再裁/形态", api_再裁形态, methods=["POST"]),
+    Route("/api/再裁/归档/{key}", api_再裁归档),
 ]

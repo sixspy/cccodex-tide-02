@@ -19,7 +19,13 @@ export function fateChip(fate) {
     "在缓冲": "ok",
     "已物化": "ok",
     "已成片": "ok",
+    "已暂存": "muted",
+    "暂存": "muted",
+    "已切流": "warn",
+    "已归档": "warn",
     "已迟到": "warn",
+    "已迟到-补救": "warn",
+    "已归档-补救": "warn",
     "撕裂": "danger",
     "对齐": "ok",
   };
@@ -45,6 +51,18 @@ export function summarizeVerify(report) {
   if (!report) return "无贯验回执";
   const ok = report["是否对齐"] ? "对齐" : "撕裂";
   return `${ok} · 在缓冲 ${report["在缓冲"]} · 切片事件 ${report["切片事件"]} · 迟到 ${report["迟到"]}`;
+}
+
+/** 处理时缓冲再裁：只读状态文案（四页共用）。 */
+export function retrimSummary(state) {
+  if (!state) return "再裁状态未加载";
+  const 态 = state["启用"] ? `已启用·${state["形态"]}` : "未启用（基线事件时入窗）";
+  const 脏 = state["现行缓冲含窗外点"] ? `现行缓冲含窗外点 ${state["脏行数"]}` : "现行缓冲无窗外点";
+  const 账 = state["最新"];
+  const 裁账 = 账
+    ? `最新裁净 批次 ${账["批次"]} 剔除 ${账["剔除数"]} 归档键 ${账["归档键"] || "—"} valid=${账["valid"]}`
+    : "尚无裁净账";
+  return `${态} · ${脏} · ${裁账} · ${state["下一步"] || ""}`;
 }
 
 export function emptyState(kind) {

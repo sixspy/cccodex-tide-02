@@ -66,11 +66,16 @@
         </div>
       </section>
       <section class="卷">
+        <h2>再裁策略卡</h2>
+        <div id="再裁"></div>
+      </section>
+      <section class="卷">
         <h2>水位</h2>
         <div class="水位" id="水位"></div>
         <div class="工具">
           <button class="按钮" id="灌成片">灌窗内成片样例</button>
           <button class="按钮 次" id="灌迟到">灌迟到样例</button>
+          <button class="按钮" id="灌混">灌混出窗样例</button>
           <button class="按钮 青" id="关窗">关当前窗</button>
           <button class="按钮 次" id="贯验">跑窗贯验</button>
         </div>
@@ -83,6 +88,7 @@
         document.getElementById("尺起").textContent = (r["窗起"] || "窗起").slice(11, 16) || "窗起";
         document.getElementById("尺止").textContent = (r["窗止"] || "窗止").slice(11, 16) || "窗止";
         潮切.渲染水位(document.getElementById("水位"), o);
+        document.getElementById("再裁").innerHTML = 潮切.再裁组(await 潮切.getJSON("/api/再裁"));
       }
       async function 跑(fn) {
         const el = document.getElementById("回执");
@@ -93,6 +99,7 @@
       }
       document.getElementById("灌成片").onclick = () => 跑(() => 潮切.postJSON("/api/观测点/夹具/窗内成片样例"));
       document.getElementById("灌迟到").onclick = () => 跑(() => 潮切.postJSON("/api/观测点/夹具/迟到样例"));
+      document.getElementById("灌混").onclick = () => 跑(() => 潮切.postJSON("/api/观测点/夹具/混入出窗样例"));
       document.getElementById("关窗").onclick = () => 跑(() => 潮切.postJSON("/api/关窗/跑"));
       document.getElementById("贯验").onclick = () => 跑(() => 潮切.postJSON("/api/窗贯验/跑"));
       刷新();
